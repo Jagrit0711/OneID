@@ -60,9 +60,9 @@ export function IdentityScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="mt-8 inline-flex min-h-20 w-full max-w-xl items-center justify-center gap-3 rounded-2xl bg-primary text-2xl font-semibold text-primary-foreground shadow-lg active:scale-[0.99]"
+          className="mt-4 sm:mt-8 inline-flex min-h-14 sm:min-h-20 w-full max-w-xl items-center justify-center gap-3 rounded-2xl bg-primary text-lg sm:text-2xl font-bold text-primary-foreground shadow-lg active:scale-[0.99]"
         >
-          Continue to face check <ArrowRight className="size-7" aria-hidden />
+          Continue to Face Check <ArrowRight className="size-6 sm:size-7" aria-hidden />
         </button>
       </div>
     </ScreenShell>

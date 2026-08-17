@@ -22,6 +22,7 @@ import { IdentityScreen, buildAddress } from "@/components/kiosk/IdentityScreen"
 import { FaceScreen, type FaceOutcome } from "@/components/kiosk/FaceScreen";
 import { OneIdLogo } from "@/components/brand/OneIdLogo";
 import { DocPreviewer } from "@/components/ui/DocPreviewer";
+import { KioskModeToggle } from "@/components/ui/KioskModeToggle";
 import {
   getUserVault,
   saveUserDocument,
@@ -259,10 +260,11 @@ function CitizenPortal() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">Aadhaar Authenticated ✓</p>
               </div>
             </div>
+            <KioskModeToggle />
             <button
               type="button"
               onClick={resetAuth}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-colors"
             >
               <LogOut className="size-3.5" /> Sign Out
             </button>

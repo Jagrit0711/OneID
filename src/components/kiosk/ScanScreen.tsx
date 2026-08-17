@@ -4,6 +4,7 @@ import { decodeAadhaarQR, type AadhaarData } from "aadhaar-react-scanner";
 import { QrCode, X, Upload, Sparkles } from "lucide-react";
 import { useCamera } from "@/hooks/useCamera";
 import { CameraFrame } from "./CameraFrame";
+import { KioskModeToggle } from "@/components/ui/KioskModeToggle";
 
 const DEMO_AADHAAR_DATA: AadhaarData = {
   name: "Suresh Kumar Sharma",
@@ -243,22 +244,25 @@ export function ScreenShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-8">
-      <div className="flex items-start justify-between gap-4">
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-4 sm:px-6 sm:py-8 select-none">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold tracking-widest text-primary uppercase">{step}</p>
-          <h1 className="mt-1 text-4xl font-semibold tracking-tight">{title}</h1>
+          <p className="text-xs font-semibold tracking-widest text-primary uppercase">{step}</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">{title}</h1>
         </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label="Cancel verification"
-          className="inline-flex size-14 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground active:scale-95"
-        >
-          <X className="size-6" aria-hidden />
-        </button>
+        <div className="flex items-center gap-2">
+          <KioskModeToggle />
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Cancel verification"
+            className="inline-flex size-10 sm:size-12 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground active:scale-95 shrink-0"
+          >
+            <X className="size-5 sm:size-6" aria-hidden />
+          </button>
+        </div>
       </div>
-      <div className="mt-8 flex-1">{children}</div>
+      <div className="mt-4 sm:mt-8 flex-1">{children}</div>
     </div>
   );
 }

@@ -149,3 +149,35 @@
 @media (max-width: 639px) {
   .vault-grid { background-size: 32px 32px; }
 }
+
+/* ── Raspberry Pi 3.5" Touchscreen (480x320 / 320x480) & Kiosk Mode Optimizations ── */
+
+html.kiosk-mode-active,
+@media (max-height: 500px) {
+  body {
+    overflow-x: hidden;
+    font-size: 13px;
+  }
+
+  /* Compact camera height for 320px height touchscreen displays */
+  .camera-container,
+  video {
+    max-height: 180px !important;
+    object-fit: cover;
+  }
+
+  /* Remove heavy blurs for 60fps performance on Pi ARM GPUs */
+  .backdrop-blur-xl,
+  .backdrop-blur-md,
+  .backdrop-blur-sm {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Large touch targets for fingers */
+  button, input, select {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+}
+

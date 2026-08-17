@@ -16,7 +16,7 @@ export function CameraFrame({
   mirrored?: boolean;
 }) {
   return (
-    <div className="relative aspect-4/3 w-full overflow-hidden rounded-3xl border border-border bg-secondary shadow-[var(--shadow-kiosk)]">
+    <div className="camera-container relative aspect-4/3 w-full max-h-[220px] sm:max-h-[380px] overflow-hidden rounded-3xl border border-border bg-secondary shadow-[var(--shadow-kiosk)]">
       <video
         ref={videoRef}
         playsInline
