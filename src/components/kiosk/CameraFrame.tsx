@@ -41,12 +41,23 @@ export function CameraFrame({
 
   return (
     <div className="camera-container relative aspect-4/3 w-full max-h-[220px] sm:max-h-[380px] overflow-hidden rounded-3xl border border-border bg-secondary shadow-[var(--shadow-kiosk)]">
+      {ipCamUrl ? (
+        <img
+          src={ipCamUrl}
+          alt="IP Camera Live Feed"
+          crossOrigin="anonymous"
+          className="size-full object-cover"
+          onError={(e) => {
+            console.warn("IP Cam live preview image error:", e);
+          }}
+        />
+      ) : null}
       <video
         ref={videoRef}
         playsInline
         muted
         autoPlay
-        className={`size-full object-cover ${mirrored && !ipCamUrl ? "-scale-x-100" : ""}`}
+        className={`size-full object-cover ${ipCamUrl ? "hidden" : mirrored ? "-scale-x-100" : ""}`}
       />
       {overlay}
 

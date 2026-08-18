@@ -37,15 +37,49 @@ export function useCamera(active: boolean, customStreamUrl?: string | null) {
       const url = customStreamUrl.trim();
       stop();
 
-      if (videoRef.current) {
-        videoRef.current.crossOrigin = "anonymous";
-        videoRef.current.src = url;
-        videoRef.current.play().catch(() => undefined);
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 480;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = url;
+
+      let animationFrameId: number = 0;
+
+      const drawLoop = () => {
+        if (cancelled) return;
+        if (ctx && img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        animationFrameId = requestAnimationFrame(drawLoop);
+      };
+
+      try {
+        const stream = canvas.captureStream ? canvas.captureStream(25) : null;
+        if (stream && videoRef.current) {
+          streamRef.current = stream;
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => undefined);
+        } else if (videoRef.current) {
+          videoRef.current.src = url;
+          videoRef.current.play().catch(() => undefined);
+        }
+      } catch (err) {
+        console.warn("Could not capture stream from canvas, fallback to direct src:", err);
+        if (videoRef.current) {
+          videoRef.current.src = url;
+          videoRef.current.play().catch(() => undefined);
+        }
       }
 
+      drawLoop();
       setState("ready");
+
       return () => {
         cancelled = true;
+        cancelAnimationFrame(animationFrameId);
         stop();
       };
     }
