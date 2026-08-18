@@ -19,7 +19,14 @@ from typing import List, Optional
 import insightface
 from insightface.app import FaceAnalysis
 
-app = FastAPI(title="InsightFace ArcFace Service", version="1.0.0")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_insightface()
+    yield
+
+app = FastAPI(title="InsightFace ArcFace Service", version="1.0.0", lifespan=lifespan)
 
 # Enable CORS for React frontend (Vite http://localhost:5173)
 app.add_middleware(
@@ -116,10 +123,6 @@ class EmbedRequest(BaseModel):
     image: str
 
 # ── Endpoints ──
-
-@app.on_event("startup")
-def startup_event():
-    init_insightface()
 
 @app.get("/health")
 def health_check():
