@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type CameraState = "idle" | "starting" | "ready" | "error" | "insecure_context";
+export type CameraState = "idle" | "starting" | "ready" | "error" | "insecure_context" | "ip_cam";
 
-export function useCamera(active: boolean) {
+export function useCamera(active: boolean, customStreamUrl?: string | null) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [state, setState] = useState<CameraState>("idle");
@@ -12,7 +12,10 @@ export function useCamera(active: boolean) {
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.removeAttribute("src");
+    }
   }, []);
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
@@ -29,20 +32,36 @@ export function useCamera(active: boolean) {
     setState("starting");
     setErrorMessage(null);
 
-    // Check if mediaDevices API is available on this browser/device
-    // Note: Chrome/Safari block getUserMedia on non-localhost HTTP IP addresses
+    // ── Mode A: Custom IP Camera / HTTP Video Stream URL ──
+    if (customStreamUrl && customStreamUrl.trim() !== "") {
+      const url = customStreamUrl.trim();
+      stop();
+
+      if (videoRef.current) {
+        videoRef.current.crossOrigin = "anonymous";
+        videoRef.current.src = url;
+        videoRef.current.play().catch(() => undefined);
+      }
+
+      setState("ready");
+      return () => {
+        cancelled = true;
+        stop();
+      };
+    }
+
+    // ── Mode B: Hardware WebCam / Mobile Camera via getUserMedia ──
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       if (!cancelled) {
         setState("insecure_context");
         setErrorMessage(
-          "Camera disabled by browser on HTTP Network IP address. Open localhost or allow camera for this IP in browser settings."
+          "Camera disabled by browser on HTTP Network IP address. Use IP Cam URL or enable chrome://flags."
         );
       }
       return;
     }
 
     const getMediaStream = async () => {
-      // 1. Try ideal front-facing HD webcam/mobile camera
       try {
         return await navigator.mediaDevices.getUserMedia({
           video: {
@@ -53,7 +72,6 @@ export function useCamera(active: boolean) {
           audio: false,
         });
       } catch {
-        // 2. Progressive fallback: request basic video from current device webcam
         return await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
@@ -88,7 +106,7 @@ export function useCamera(active: boolean) {
       cancelled = true;
       stop();
     };
-  }, [active, attempt, stop]);
+  }, [active, attempt, customStreamUrl, stop]);
 
   return { videoRef, state, errorMessage, retry, stop };
 }

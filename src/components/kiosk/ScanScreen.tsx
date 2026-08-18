@@ -31,7 +31,8 @@ export function ScanScreen({
   onDecoded: (data: AadhaarData) => void;
   onCancel: () => void;
 }) {
-  const { videoRef, state, errorMessage, retry } = useCamera(true);
+  const [ipCamUrl, setIpCamUrl] = useState<string | null>(null);
+  const { videoRef, state, errorMessage, retry } = useCamera(true, ipCamUrl);
   const [status, setStatus] = useState("Hold the Aadhaar Secure QR code inside the frame");
   const [invalid, setInvalid] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +183,8 @@ export function ScanScreen({
         state={state}
         errorMessage={errorMessage}
         onRetry={retry}
+        ipCamUrl={ipCamUrl}
+        onSetIpCamUrl={setIpCamUrl}
         overlay={
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="size-[68%] rounded-3xl border-4 border-emerald-500/80 shadow-2xl" />

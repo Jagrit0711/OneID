@@ -48,7 +48,8 @@ export function FaceScreen({
   onDone: (outcome: FaceOutcome) => void;
   onCancel: () => void;
 }) {
-  const { videoRef, state, errorMessage, retry } = useCamera(true);
+  const [ipCamUrl, setIpCamUrl] = useState<string | null>(null);
+  const { videoRef, state, errorMessage, retry } = useCamera(true, ipCamUrl);
   const [phase, setPhase]         = useState<Phase>("loading");
   const [status, setStatus]       = useState("Initializing InsightFace ArcFace engine…");
   const [stable, setStable]       = useState(0);
@@ -248,6 +249,8 @@ export function FaceScreen({
         state={state}
         errorMessage={errorMessage}
         onRetry={retry}
+        ipCamUrl={ipCamUrl}
+        onSetIpCamUrl={setIpCamUrl}
         mirrored
         overlay={
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
