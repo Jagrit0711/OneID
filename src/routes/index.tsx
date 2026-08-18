@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   motion,
@@ -246,6 +246,106 @@ function FeatureRow({ number, title, body }: { number: string; title: string; bo
 }
 
 function OneIDHome() {
+  const [isPortraitKiosk, setIsPortraitKiosk] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kioskParam = params.get("kiosk");
+    const savedPortrait =
+      localStorage.getItem("oneid_portrait_kiosk") === "true" ||
+      kioskParam === "portrait";
+
+    if (savedPortrait) {
+      setIsPortraitKiosk(true);
+      document.documentElement.classList.add("kiosk-mode-active");
+    }
+  }, []);
+
+  const togglePortraitKiosk = () => {
+    const next = !isPortraitKiosk;
+    setIsPortraitKiosk(next);
+    localStorage.setItem("oneid_portrait_kiosk", String(next));
+    if (next) {
+      document.documentElement.classList.add("kiosk-mode-active");
+    } else {
+      document.documentElement.classList.remove("kiosk-mode-active");
+    }
+  };
+
+  // ── Dedicated Portrait Kiosk Mode View ──
+  if (isPortraitKiosk) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-between bg-ink px-6 py-8 text-white select-none text-center">
+        {/* Top Header */}
+        <div className="w-full flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="flex items-center gap-2">
+            <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[10px] font-bold tracking-widest text-emerald-400 uppercase">
+              Portrait Kiosk Terminal Active
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={togglePortraitKiosk}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/20"
+          >
+            Full Site
+          </button>
+        </div>
+
+        {/* Center Content: Logo & Big Login Buttons */}
+        <div className="my-auto w-full max-w-sm space-y-8 py-6">
+          <div className="flex flex-col items-center justify-center gap-2">
+            <OneIdLogo size="xl" />
+            <h1 className="mt-2 font-display text-3xl text-ivory">OneID Kiosk</h1>
+            <p className="text-xs text-white/60">Select your portal to begin biometric verification</p>
+          </div>
+
+          <div className="space-y-4 pt-2">
+            {/* Button 1: Citizen Login */}
+            <Link
+              to="/user"
+              className="group flex w-full items-center justify-between rounded-3xl border border-teal-500/40 bg-gradient-to-r from-teal-950/80 via-slate-900 to-slate-900 p-5 shadow-xl hover:border-teal-400 active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-4 text-left">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-teal-500/20 text-teal-300 ring-1 ring-teal-500/30">
+                  <FolderLock className="size-7" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-ivory">Citizen Login</h2>
+                  <p className="text-xs text-white/60">Document Locker &amp; Permissions</p>
+                </div>
+              </div>
+              <ArrowRight className="size-6 text-teal-400 transition-transform group-hover:translate-x-1" />
+            </Link>
+
+            {/* Button 2: Official Login */}
+            <Link
+              to="/official"
+              className="group flex w-full items-center justify-between rounded-3xl border border-saffron/40 bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900 p-5 shadow-xl hover:border-saffron active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-4 text-left">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-saffron/20 text-saffron ring-1 ring-saffron/30">
+                  <UserCheck className="size-7" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-ivory">Official Login</h2>
+                  <p className="text-xs text-white/60">Verification Terminal &amp; Logs</p>
+                </div>
+              </div>
+              <ArrowRight className="size-6 text-saffron transition-transform group-hover:translate-x-1" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="w-full border-t border-white/10 pt-4 text-[10px] text-white/40">
+          100% Offline &amp; Privacy-First Biometric Identity Terminal
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main id="top" className="overflow-x-clip bg-ink text-white select-none">
       {/* ── Header ── */}
@@ -262,6 +362,13 @@ function OneIDHome() {
           </nav>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={togglePortraitKiosk}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-[0.6rem] font-bold uppercase tracking-[0.15em] text-amber-300 transition-all hover:bg-amber-500/25 active:scale-[0.97]"
+            >
+              Portrait Kiosk
+            </button>
             <Link
               to="/user"
               className="inline-flex items-center gap-2 rounded-xl border border-white/18 bg-white/[0.07] px-4 py-2.5 text-[0.6rem] font-bold uppercase tracking-[0.15em] text-ivory transition-all duration-200 hover:border-saffron hover:bg-saffron hover:text-ink active:scale-[0.97]"
