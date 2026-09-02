@@ -10,7 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConsumerRouteImport } from './routes/consumer'
+import { Route as KioskRouteImport } from './routes/kiosk'
 import { Route as OfficialRouteImport } from './routes/official'
+import { Route as SuperRouteImport } from './routes/super'
 import { Route as UserRouteImport } from './routes/user'
 
 const IndexRoute = IndexRouteImport.update({
@@ -18,9 +21,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsumerRoute = ConsumerRouteImport.update({
+  id: '/consumer',
+  path: '/consumer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KioskRoute = KioskRouteImport.update({
+  id: '/kiosk',
+  path: '/kiosk',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OfficialRoute = OfficialRouteImport.update({
   id: '/official',
   path: '/official',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperRoute = SuperRouteImport.update({
+  id: '/super',
+  path: '/super',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserRoute = UserRouteImport.update({
@@ -31,31 +49,44 @@ const UserRoute = UserRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/consumer': typeof ConsumerRoute
+  '/kiosk': typeof KioskRoute
   '/official': typeof OfficialRoute
+  '/super': typeof SuperRoute
   '/user': typeof UserRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/consumer': typeof ConsumerRoute
+  '/kiosk': typeof KioskRoute
   '/official': typeof OfficialRoute
+  '/super': typeof SuperRoute
   '/user': typeof UserRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/consumer': typeof ConsumerRoute
+  '/kiosk': typeof KioskRoute
   '/official': typeof OfficialRoute
+  '/super': typeof SuperRoute
   '/user': typeof UserRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/official' | '/user'
+  fullPaths: '/' | '/consumer' | '/kiosk' | '/official' | '/super' | '/user'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/official' | '/user'
-  id: '__root__' | '/' | '/official' | '/user'
+  to: '/' | '/consumer' | '/kiosk' | '/official' | '/super' | '/user'
+  id:
+    '__root__' | '/' | '/consumer' | '/kiosk' | '/official' | '/super' | '/user'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConsumerRoute: typeof ConsumerRoute
+  KioskRoute: typeof KioskRoute
   OfficialRoute: typeof OfficialRoute
+  SuperRoute: typeof SuperRoute
   UserRoute: typeof UserRoute
 }
 
@@ -68,11 +99,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/consumer': {
+      id: '/consumer'
+      path: '/consumer'
+      fullPath: '/consumer'
+      preLoaderRoute: typeof ConsumerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kiosk': {
+      id: '/kiosk'
+      path: '/kiosk'
+      fullPath: '/kiosk'
+      preLoaderRoute: typeof KioskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/official': {
       id: '/official'
       path: '/official'
       fullPath: '/official'
       preLoaderRoute: typeof OfficialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super': {
+      id: '/super'
+      path: '/super'
+      fullPath: '/super'
+      preLoaderRoute: typeof SuperRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user': {
@@ -87,7 +139,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConsumerRoute: ConsumerRoute,
+  KioskRoute: KioskRoute,
   OfficialRoute: OfficialRoute,
+  SuperRoute: SuperRoute,
   UserRoute: UserRoute,
 }
 export const routeTree = rootRouteImport

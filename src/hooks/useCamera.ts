@@ -96,12 +96,15 @@ export function useCamera(active: boolean, customStreamUrl?: string | null) {
     }
 
     const getMediaStream = async () => {
+      // For document/QR scanning on a desktop webcam (e.g. Logitech Brio 100):
+      //  - No facingMode (front/back only makes sense on mobile; breaks desktop cam selection)
+      //  - 1080p for dense Aadhaar Secure QR modules
+      //  - environment facing is skipped intentionally for USB webcams
       try {
         return await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
           audio: false,
         });
@@ -109,6 +112,40 @@ export function useCamera(active: boolean, customStreamUrl?: string | null) {
         return await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
+        });
+      }
+    };
+
+    /** After acquiring the stream, push continuous autofocus + close focus distance
+     *  to help webcams like the Logitech Brio 100 lock onto a held-up card. */
+    const applyFocusTweaks = (stream: MediaStream) => {
+      const track = stream.getVideoTracks()[0];
+      if (!track) return;
+
+      const capabilities = track.getCapabilities?.() as Record<string, unknown> | undefined;
+      if (!capabilities) return;
+
+      const constraints: Record<string, unknown> = {};
+
+      // Request continuous autofocus if the camera exposes the focusMode capability
+      if (capabilities.focusMode) {
+        const modes = capabilities.focusMode as string[];
+        if (modes.includes("continuous")) {
+          constraints.focusMode = "continuous";
+        }
+      }
+
+      // Pull focus closer (0.0 = infinity, higher = closer); Brio 100 typical range ~0–1
+      if (capabilities.focusDistance) {
+        const range = capabilities.focusDistance as { min: number; max: number };
+        // Target ~30 cm document distance — use 40% of the focusDistance range
+        const closeDistance = range.min + (range.max - range.min) * 0.4;
+        constraints.focusDistance = closeDistance;
+      }
+
+      if (Object.keys(constraints).length > 0) {
+        track.applyConstraints({ advanced: [constraints as MediaTrackConstraintSet] }).catch(() => {
+          // Not all browsers/drivers support advanced focus constraints — silently ignore
         });
       }
     };
@@ -124,6 +161,8 @@ export function useCamera(active: boolean, customStreamUrl?: string | null) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => undefined);
         }
+        // Apply focus tweaks after play so the track is fully active
+        applyFocusTweaks(stream);
         setState("ready");
       })
       .catch((err) => {

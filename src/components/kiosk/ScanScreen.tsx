@@ -40,6 +40,67 @@ export function ScanScreen({
   const doneRef = useRef(false);
 
   // Real-time camera QR scanner loop
+  // ── Image pre-processing helpers ─────────────────────────────────────────
+  // The Logitech Brio 100 (and similar USB webcams on macOS) struggles to
+  // auto-focus on close-up documents.  Applying an unsharp-mask convolution +
+  // contrast boost in software compensates enough for jsQR / BarcodeDetector
+  // to decode QR codes that look blurry in the live preview.
+
+  /**
+   * Apply a 3×3 unsharp-mask sharpening kernel to raw ImageData in-place.
+   * Kernel:  [ 0  -1   0 ]
+   *          [-1   5  -1 ]
+   *          [ 0  -1   0 ]
+   * This emphasises edges — exactly what a QR code module boundary is.
+   */
+  const sharpenImageData = (imageData: ImageData): ImageData => {
+    const { data, width, height } = imageData;
+    const out = new Uint8ClampedArray(data.length);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+
+        for (let c = 0; c < 3; c++) {
+          // Neighbour indices (clamp to edges)
+          const up    = ((Math.max(y - 1, 0)) * width + x) * 4 + c;
+          const down  = ((Math.min(y + 1, height - 1)) * width + x) * 4 + c;
+          const left  = (y * width + Math.max(x - 1, 0)) * 4 + c;
+          const right = (y * width + Math.min(x + 1, width - 1)) * 4 + c;
+
+          // Unsharp-mask: 5×center − (up+down+left+right)
+          const sharpened = 5 * data[i + c]! - data[up]! - data[down]! - data[left]! - data[right]!;
+          out[i + c] = Math.max(0, Math.min(255, sharpened));
+        }
+        out[i + 3] = data[i + 3]!; // preserve alpha
+      }
+    }
+
+    return new ImageData(out, width, height);
+  };
+
+  /**
+   * Draw the video frame onto the canvas then apply sharpening so the QR
+   * decoder receives a crisper image even when the camera is slightly out of
+   * focus.  Returns a second off-screen canvas with the processed pixels.
+   */
+  const buildProcessedCanvas = (
+    source: HTMLVideoElement,
+    rawCanvas: HTMLCanvasElement,
+    rawCtx: CanvasRenderingContext2D,
+  ): HTMLCanvasElement => {
+    rawCanvas.width = source.videoWidth;
+    rawCanvas.height = source.videoHeight;
+    rawCtx.drawImage(source, 0, 0, rawCanvas.width, rawCanvas.height);
+
+    const imageData = rawCtx.getImageData(0, 0, rawCanvas.width, rawCanvas.height);
+    const sharpened = sharpenImageData(imageData);
+    rawCtx.putImageData(sharpened, 0, 0);
+
+    return rawCanvas;
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (state !== "ready") return;
     const canvas = document.createElement("canvas");
@@ -77,12 +138,10 @@ export function ScanScreen({
     const tick = async () => {
       const video = videoRef.current;
       if (!doneRef.current && video && video.videoWidth > 0 && !busyRef.current) {
-        // High resolution scanning to preserve dense module details of Aadhaar Secure QR
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Draw + sharpen: compensates for Brio 100 soft-focus on close-up cards
+        const processedCanvas = buildProcessedCanvas(video, canvas, ctx);
 
-        const qrString = await detectFromImage(canvas);
+        const qrString = await detectFromImage(processedCanvas);
         if (qrString) {
           busyRef.current = true;
           setStatus("Decoding Aadhaar Secure QR payload…");
@@ -109,6 +168,7 @@ export function ScanScreen({
 
     void tick();
     return () => cancelAnimationFrame(raf);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, videoRef, onDecoded]);
 
   // Handle uploaded image file fallback (for laptops/testing without camera focus)

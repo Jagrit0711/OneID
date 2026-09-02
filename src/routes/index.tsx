@@ -362,18 +362,17 @@ function OneIDHome() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={togglePortraitKiosk}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-[0.6rem] font-bold uppercase tracking-[0.15em] text-amber-300 transition-all hover:bg-amber-500/25 active:scale-[0.97]"
-            >
-              Portrait Kiosk
-            </button>
             <Link
-              to="/user"
+              to="/super"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-violet-500/40 bg-violet-500/15 px-3 py-2 text-[0.6rem] font-bold uppercase tracking-[0.15em] text-violet-300 transition-all hover:bg-violet-500/25 active:scale-[0.97]"
+            >
+              Super Admin
+            </Link>
+            <Link
+              to="/kiosk"
               className="inline-flex items-center gap-2 rounded-xl border border-white/18 bg-white/[0.07] px-4 py-2.5 text-[0.6rem] font-bold uppercase tracking-[0.15em] text-ivory transition-all duration-200 hover:border-saffron hover:bg-saffron hover:text-ink active:scale-[0.97]"
             >
-              Citizen Vault <ArrowRight className="h-3.5 w-3.5" />
+              Kiosk Terminal <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
@@ -399,16 +398,16 @@ function OneIDHome() {
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
-                to="/official"
+                to="/kiosk"
                 className="group inline-flex items-center gap-3 bg-saffron px-6 py-4 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-ink transition-colors hover:bg-ivory active:scale-[0.97] rounded-xl shadow-lg"
               >
-                Official Verification Kiosk <UserCheck className="h-4 w-4" />
+                Kiosk Terminal <ScanLine className="h-4 w-4" />
               </Link>
               <Link
-                to="/user"
+                to="/consumer"
                 className="group inline-flex items-center gap-3 border border-white/20 bg-white/[0.06] px-6 py-4 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-ivory transition-colors hover:bg-white/10 active:scale-[0.97] rounded-xl"
               >
-                Citizen Document Locker <FolderLock className="h-4 w-4" />
+                Citizen App <FolderLock className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -420,11 +419,11 @@ function OneIDHome() {
       {/* ── 3D Card Orbit Convergence Journey ── */}
       <VaultJourney />
 
-      {/* ── Direct Portal Entrance Cards Section ── */}
+      {/* ── Portal Cards Section ── */}
       <section id="portals" className="relative border-t border-white/10 bg-[#172044] px-6 py-24 sm:py-32">
         <div className="mx-auto max-w-6xl">
           <div className="text-center">
-            <StatusPill>Dual Portal Architecture</StatusPill>
+            <StatusPill>Four-Portal Architecture</StatusPill>
             <h2 className="mt-6 font-display text-[clamp(2.8rem,5vw,4.5rem)] leading-[0.88] text-ivory">
               Choose your entry point.
             </h2>
@@ -433,41 +432,85 @@ function OneIDHome() {
             </p>
           </div>
 
-          <div className="mt-14 grid gap-8 sm:grid-cols-2">
-            {/* Official Kiosk Card */}
-            <div className="relative flex flex-col justify-between rounded-3xl border border-white/16 bg-slate-900/90 p-8 shadow-2xl">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
+            {/* Kiosk Terminal */}
+            <div className="relative flex flex-col justify-between rounded-3xl border border-saffron/30 bg-gradient-to-br from-amber-950/60 via-slate-900/90 to-slate-900/90 p-8 shadow-2xl">
               <div>
-                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-saffron">For Verifying Officers</span>
-                <h3 className="mt-3 font-display text-3xl text-ivory">Official Kiosk &amp; Audit Portal</h3>
+                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-saffron">For Verifying Officers · Physical Terminal</span>
+                <h3 className="mt-3 font-display text-3xl text-ivory">Kiosk Terminal</h3>
                 <p className="mt-3 text-sm text-white/60 leading-relaxed">
-                  Authenticate via official Aadhaar card, scan citizens, select document inspection scopes, and generate live biometric audit logs.
+                  Official logs in with Aadhaar + face. Scans citizens, selects documents, gates additional doc access behind citizen face scan. Auto-resets after each session.
                 </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {["Official Aadhaar Login", "Citizen QR Scan", "Doc Selection", "Face Gate", "Auto-Reset"].map((tag) => (
+                    <span key={tag} className="rounded-full border border-saffron/30 bg-saffron/10 px-2.5 py-0.5 text-[0.58rem] font-semibold text-saffron/80">{tag}</span>
+                  ))}
+                </div>
               </div>
               <div className="mt-8">
-                <Link
-                  to="/official"
-                  className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-saffron font-bold text-ink hover:bg-ivory transition-all active:scale-[0.98]"
-                >
-                  Enter Official Portal <ArrowRight className="size-4" />
+                <Link to="/kiosk" className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-saffron font-bold text-ink hover:bg-amber-400 transition-all active:scale-[0.98]">
+                  Enter Kiosk Terminal <ArrowRight className="size-4" />
                 </Link>
               </div>
             </div>
 
-            {/* Citizen Locker Card */}
-            <div className="relative flex flex-col justify-between rounded-3xl border border-white/16 bg-slate-900/90 p-8 shadow-2xl">
+            {/* Consumer App */}
+            <div className="relative flex flex-col justify-between rounded-3xl border border-celadon/30 bg-gradient-to-br from-teal-950/60 via-slate-900/90 to-slate-900/90 p-8 shadow-2xl">
               <div>
-                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-celadon">For Cardholders &amp; Citizens</span>
-                <h3 className="mt-3 font-display text-3xl text-ivory">Citizen Document Locker</h3>
+                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-celadon">For Citizens · Personal App</span>
+                <h3 className="mt-3 font-display text-3xl text-ivory">Consumer App</h3>
                 <p className="mt-3 text-sm text-white/60 leading-relaxed">
-                  Log in via Aadhaar QR scan &amp; face check. Upload PAN, DL, Ration Card, and Marksheets with granular verifier access toggles.
+                  Log in with Aadhaar QR + face. Upload PAN, DL, Ration Card, Marksheets in JP2 format. Control verifier permissions. See who accessed your data and when.
                 </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {["Document Vault", "JP2 Format", "Access Log", "Permission Toggles", "Privacy First"].map((tag) => (
+                    <span key={tag} className="rounded-full border border-celadon/30 bg-celadon/10 px-2.5 py-0.5 text-[0.58rem] font-semibold text-celadon/80">{tag}</span>
+                  ))}
+                </div>
               </div>
               <div className="mt-8">
-                <Link
-                  to="/user"
-                  className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/[0.08] font-bold text-ivory hover:bg-white/15 transition-all active:scale-[0.98]"
-                >
-                  Enter Citizen Vault <ArrowRight className="size-4" />
+                <Link to="/consumer" className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-celadon/40 bg-celadon/10 font-bold text-ivory hover:bg-celadon/20 transition-all active:scale-[0.98]">
+                  Enter Consumer App <ArrowRight className="size-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Super-Official */}
+            <div className="relative flex flex-col justify-between rounded-3xl border border-violet-500/30 bg-gradient-to-br from-violet-950/60 via-slate-900/90 to-slate-900/90 p-8 shadow-2xl">
+              <div>
+                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-violet-400">For Administrators · Command Center</span>
+                <h3 className="mt-3 font-display text-3xl text-ivory">Super-Official Dashboard</h3>
+                <p className="mt-3 text-sm text-white/60 leading-relaxed">
+                  Global audit logs across all sessions. Citizen lookup with full access history. Official management, enable/disable officials, record updates and live stats.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {["Global Audit", "Citizen Lookup", "Official Mgmt", "PIN Auth", "Live Stats"].map((tag) => (
+                    <span key={tag} className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-[0.58rem] font-semibold text-violet-400/80">{tag}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-8">
+                <Link to="/super" className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-violet-500/40 bg-violet-500/10 font-bold text-ivory hover:bg-violet-500/20 transition-all active:scale-[0.98]">
+                  Enter Super-Official <ArrowRight className="size-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Legacy portals */}
+            <div className="relative flex flex-col justify-between rounded-3xl border border-white/10 bg-slate-900/60 p-8 shadow-xl">
+              <div>
+                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-white/40">Legacy · Previous Version</span>
+                <h3 className="mt-3 font-display text-2xl text-white/60">Original Portals</h3>
+                <p className="mt-3 text-sm text-white/40 leading-relaxed">
+                  Previous official &amp; citizen portals (v1). Still accessible for reference.
+                </p>
+              </div>
+              <div className="mt-8 flex gap-3">
+                <Link to="/official" className="flex-1 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] text-sm font-semibold text-white/50 hover:bg-white/10 transition-all active:scale-[0.98]">
+                  Official (v1)
+                </Link>
+                <Link to="/user" className="flex-1 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] text-sm font-semibold text-white/50 hover:bg-white/10 transition-all active:scale-[0.98]">
+                  Citizen (v1)
                 </Link>
               </div>
             </div>
