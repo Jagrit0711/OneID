@@ -17,6 +17,24 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
+# ── X display target (critical when launching from SSH) ──────────────────────
+# Without this, Firefox/Chromium don't know which screen to open on.
+# :0 = the RPi's physical HDMI display.
+export DISPLAY="${DISPLAY:-:0}"
+# Try common Xauthority locations so xset/unclutter also work over SSH
+XAUTH_CANDIDATES=(
+  "$HOME/.Xauthority"
+  "/home/pi/.Xauthority"
+  "/home/oneid/.Xauthority"
+  "/run/user/1000/gdm/Xauthority"
+)
+for xa in "${XAUTH_CANDIDATES[@]}"; do
+  if [ -f "$xa" ]; then
+    export XAUTHORITY="$xa"
+    break
+  fi
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT=5173
 KIOSK_URL="http://localhost:${PORT}/kiosk"
