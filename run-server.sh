@@ -39,8 +39,16 @@ echo "  [deps]  Checking requirements..."
 echo "  [deps]  All packages ready ✓"
 
 # ── 3. Start the server ────────────────────────────────────────────────────────
+# Detect LAN IP so user knows what to pass to run-kiosk.sh on the RPi
+LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "unknown")
+
 echo ""
-echo "  [server] Starting on  http://localhost:8000"
+echo "  [server] Starting on  http://0.0.0.0:8000"
+echo "  [server] LAN address  http://${LAN_IP}:8000"
+echo "  [server] ──────────────────────────────────────────────"
+echo "  [server] Pass this IP to the RPi kiosk launcher:"
+echo "           ./run-kiosk.sh ${LAN_IP}"
+echo "  [server] ──────────────────────────────────────────────"
 echo "  [server] Press  Ctrl+C  to stop"
 echo ""
 
