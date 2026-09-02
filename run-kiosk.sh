@@ -2,6 +2,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  OneID — Kiosk Launcher  (Raspberry Pi 4)
 #  Usage:  ./run-kiosk.sh [MACBOOK_IP]
+#
+#  Works on both X11 and Wayland (Raspberry Pi OS Bookworm default).
+#  Run from a terminal on the RPi desktop, OR set up autostart with:
+#    ./setup-autostart.sh YOUR_MACBOOK_IP
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,57 +23,71 @@ echo "  InsightFace API  →  ${VITE_FACE_API_URL}"
 echo "  Kiosk URL        →  ${KIOSK_URL}"
 echo ""
 
-# ── Detect X display + authority ─────────────────────────────────────────────
-# When running via SSH, DISPLAY is unset. Force :0 (RPi physical screen).
-export DISPLAY="${DISPLAY:-:0}"
+# ── Detect display server: Wayland or X11 ────────────────────────────────────
+DISPLAY_MODE="unknown"
 
-# Auto-detect the logged-in desktop user and their .Xauthority
-DESKTOP_USER=$(who | grep "(:0)" | awk '{print $1}' | head -1)
-[ -z "$DESKTOP_USER" ] && DESKTOP_USER=$(who | awk '{print $1}' | head -1)
-[ -z "$DESKTOP_USER" ] && DESKTOP_USER="$(logname 2>/dev/null || echo oneid)"
+# Wayland: check for a wayland socket in XDG_RUNTIME_DIR
+XDG_RT="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if [ -S "${XDG_RT}/wayland-0" ]; then
+  DISPLAY_MODE="wayland"
+  export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+  export XDG_RUNTIME_DIR="$XDG_RT"
+  export MOZ_ENABLE_WAYLAND=1          # tell Firefox to use Wayland natively
+  export GDK_BACKEND=wayland
+  unset DISPLAY                        # don't confuse apps with stale DISPLAY
+  echo "  [disp]  Mode=Wayland  WAYLAND_DISPLAY=${WAYLAND_DISPLAY}"
+  echo "  [disp]  XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}"
 
-echo "  [disp]  DISPLAY=${DISPLAY}  desktop_user=${DESKTOP_USER}"
+elif [ -n "${DISPLAY}" ] || [ -e "/tmp/.X11-unix/X0" ]; then
+  DISPLAY_MODE="x11"
+  export DISPLAY="${DISPLAY:-:0}"
+  # Find Xauthority
+  for xa in \
+    "$HOME/.Xauthority" \
+    "/home/oneid/.Xauthority" \
+    "/home/pi/.Xauthority" \
+    "/var/run/lightdm/root/:0" \
+    "/run/user/1000/gdm/Xauthority"; do
+    if [ -f "$xa" ]; then
+      export XAUTHORITY="$xa"
+      break
+    fi
+  done
+  echo "  [disp]  Mode=X11  DISPLAY=${DISPLAY}  XAUTHORITY=${XAUTHORITY:-unset}"
 
-# Find Xauthority
-for xa in \
-  "/home/${DESKTOP_USER}/.Xauthority" \
-  "$HOME/.Xauthority" \
-  "/run/user/1000/gdm/Xauthority" \
-  "/var/run/lightdm/root/:0"; do
-  if [ -f "$xa" ]; then
-    export XAUTHORITY="$xa"
-    echo "  [disp]  XAUTHORITY=${XAUTHORITY}"
-    break
-  fi
-done
-
-# Quick X connectivity test
-if ! xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+else
   echo ""
-  echo "  [ERROR] Cannot connect to X display ${DISPLAY}."
-  echo "          Make sure the RPi desktop is running (not console-only)."
-  echo "          Run this script from a terminal INSIDE the desktop, not SSH."
+  echo "  ────────────────────────────────────────────────────────"
+  echo "  [ERROR] No display server found (tried Wayland + X11)."
   echo ""
-  echo "  Alternatively, open a terminal on the RPi desktop and run:"
-  echo "    DISPLAY=:0 firefox-esr --kiosk ${KIOSK_URL}"
+  echo "  This script must run from a terminal on the RPi desktop."
+  echo "  SSH sessions cannot launch GUI apps."
+  echo ""
+  echo "  Fix options:"
+  echo "  1) Open a terminal on the RPi screen and re-run this script."
+  echo "  2) Set up autostart (runs automatically on desktop boot):"
+  echo "       ./setup-autostart.sh ${MACBOOK_IP}"
+  echo "  ────────────────────────────────────────────────────────"
   echo ""
   exit 1
 fi
-echo "  [disp]  X display OK ✓"
 
-# ── Kill old kiosk instances ──────────────────────────────────────────────────
-pkill -f "firefox.*kiosk"         2>/dev/null || true
-pkill -f "chromium.*--kiosk"      2>/dev/null || true
+# ── Kill old instances ────────────────────────────────────────────────────────
+pkill -f "firefox.*kiosk"       2>/dev/null || true
+pkill -f "chromium.*--kiosk"    2>/dev/null || true
+sleep 1
 
-# ── Disable screensaver + blanking ───────────────────────────────────────────
-DISPLAY="$DISPLAY" xset s off    2>/dev/null || true
-DISPLAY="$DISPLAY" xset s noblank 2>/dev/null || true
-DISPLAY="$DISPLAY" xset -dpms    2>/dev/null || true
+# ── Screensaver / blanking off ────────────────────────────────────────────────
+if [ "$DISPLAY_MODE" = "x11" ]; then
+  xset s off     2>/dev/null || true
+  xset s noblank 2>/dev/null || true
+  xset -dpms     2>/dev/null || true
+fi
 
 # ── Hide cursor ───────────────────────────────────────────────────────────────
 UNCLUTTER_PID=""
-if command -v unclutter &>/dev/null; then
-  DISPLAY="$DISPLAY" unclutter -idle 0.5 -root &
+if command -v unclutter &>/dev/null && [ "$DISPLAY_MODE" = "x11" ]; then
+  unclutter -idle 0.5 -root &
   UNCLUTTER_PID=$!
 fi
 
@@ -80,55 +98,54 @@ npm run dev -- --port "${PORT}" --host &
 VITE_PID=$!
 
 # ── Wait for Vite ─────────────────────────────────────────────────────────────
-echo "  [wait]  Waiting for Vite..."
+echo "  [wait]  Waiting for Vite to be ready..."
 MAX_WAIT=120
 ELAPSED=0
 until curl -sf "http://localhost:${PORT}" > /dev/null 2>&1; do
   sleep 1
   ELAPSED=$((ELAPSED + 1))
-  [ "$ELAPSED" -ge "$MAX_WAIT" ] && echo "  [error] Timeout." && kill "$VITE_PID" && exit 1
+  if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
+    echo "  [error] Timeout waiting for Vite."
+    kill "$VITE_PID" 2>/dev/null || true
+    exit 1
+  fi
   printf "  [wait]  %ds...\r" "$ELAPSED"
 done
 echo "  [vite]  Ready ✓                    "
 echo ""
 
-# ── Pick browser ──────────────────────────────────────────────────────────────
+# ── Find browser ──────────────────────────────────────────────────────────────
 BROWSER_BIN=""
 BROWSER_TYPE=""
 for candidate in firefox-esr firefox; do
   if command -v "$candidate" &>/dev/null; then
-    BROWSER_BIN="$candidate"
-    BROWSER_TYPE="firefox"
-    break
+    BROWSER_BIN="$candidate"; BROWSER_TYPE="firefox"; break
   fi
 done
 if [ -z "$BROWSER_BIN" ]; then
   for candidate in chromium-browser chromium google-chrome; do
     if command -v "$candidate" &>/dev/null; then
-      BROWSER_BIN="$candidate"
-      BROWSER_TYPE="chromium"
-      break
+      BROWSER_BIN="$candidate"; BROWSER_TYPE="chromium"; break
     fi
   done
 fi
 
-echo "  [browser] Found: ${BROWSER_BIN:-NONE}"
+echo "  [browser] Using: ${BROWSER_BIN:-NONE (not found)}"
 
 if [ -z "$BROWSER_BIN" ]; then
-  echo "  [error] No browser found. Install with: sudo apt install firefox-esr"
+  echo "  [error] No browser. Run: sudo apt install firefox-esr"
   kill "$VITE_PID" 2>/dev/null || true
   exit 1
 fi
 
-# ── Launch browser in kiosk ───────────────────────────────────────────────────
-KIOSK_PROFILE="/tmp/oneid-ff-kiosk"
+# ── Launch kiosk ──────────────────────────────────────────────────────────────
+KIOSK_PROFILE="/tmp/oneid-kiosk-profile"
 rm -rf "$KIOSK_PROFILE"
 mkdir -p "$KIOSK_PROFILE"
 
-echo "  [kiosk] Launching ${BROWSER_BIN} --kiosk on DISPLAY=${DISPLAY}..."
+echo "  [kiosk] Launching ${BROWSER_BIN} --kiosk (${DISPLAY_MODE})..."
 
 if [ "$BROWSER_TYPE" = "firefox" ]; then
-  DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
   "$BROWSER_BIN" \
     --kiosk \
     --no-remote \
@@ -136,11 +153,11 @@ if [ "$BROWSER_TYPE" = "firefox" ]; then
     --profile "$KIOSK_PROFILE" \
     "$KIOSK_URL" &
 else
-  DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" \
   "$BROWSER_BIN" \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \
+    --disable-session-crashed-bubble \
     --incognito \
     "$KIOSK_URL" &
 fi
@@ -149,9 +166,9 @@ echo "  [kiosk] PID=${BROWSER_PID} — press Ctrl+C to stop."
 
 # ── Shutdown ──────────────────────────────────────────────────────────────────
 cleanup() {
-  echo ""; echo "  [stop]  Shutting down..."
-  kill "$BROWSER_PID"   2>/dev/null || true
-  kill "$VITE_PID"      2>/dev/null || true
+  echo ""; echo "  [stop] Shutting down..."
+  kill "$BROWSER_PID" 2>/dev/null || true
+  kill "$VITE_PID"    2>/dev/null || true
   [ -n "$UNCLUTTER_PID" ] && kill "$UNCLUTTER_PID" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
