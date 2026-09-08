@@ -1,9 +1,15 @@
-fastapi>=0.100.0
-uvicorn>=0.22.0
+# Pinned for ARM64 (aarch64) + Python 3.8 (JetPack 4.x / Ubuntu 18.04)
+# FastAPI 0.100+ requires Python 3.7+ — JetPack default is 3.6, use python3.8
+fastapi==0.103.2
+uvicorn==0.23.2
+starlette==0.27.0
+pydantic==1.10.13
+python-multipart==0.0.6
+aiofiles==23.1.0
+numpy>=1.24.0,<2.0
+pillow>=9.5.0,<11.0
+opencv-python-headless>=4.8.0,<4.10
 insightface>=0.7.3
+# onnxruntime: try onnxruntime-gpu first (Jetson CUDA), fall back to CPU
+# pip install onnxruntime-gpu || pip install onnxruntime>=1.15.0
 onnxruntime>=1.15.0
-opencv-python-headless>=4.8.0
-numpy>=1.24.0
-pillow>=9.5.0
-python-multipart>=0.0.6
-aiofiles>=23.1.0

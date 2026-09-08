@@ -186,23 +186,61 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5 — Python venv + InsightFace
+# STEP 5 — Python 3.8 venv + InsightFace
+# JetPack 4.x ships Python 3.6 by default which is too old for FastAPI 0.100+
+# Ubuntu 18.04 has Python 3.8 in standard repos — install and use it.
 # ═══════════════════════════════════════════════════════════════════════════════
-step "Python venv + AI dependencies"
+step "Python 3.8 venv + AI dependencies"
+
+# Ensure Python 3.8 is installed
+if ! command -v python3.8 &>/dev/null; then
+  info "Installing Python 3.8 (required — JetPack default is 3.6)..."
+  sudo apt-get install -y --no-install-recommends python3.8 python3.8-venv python3.8-dev
+  ok "Python 3.8 installed"
+else
+  ok "Python 3.8 found: $(python3.8 --version)"
+fi
+
 SERVER_DIR="$SCRIPT_DIR/server"
 VENV_DIR="$SERVER_DIR/venv"
 PYTHON="$VENV_DIR/bin/python"
 PIP="$VENV_DIR/bin/pip"
-[ ! -f "$PYTHON" ] && python3 -m venv "$VENV_DIR"
-"$PIP" install --quiet --upgrade pip
+
+# Recreate venv if it was made with wrong Python version
+if [ -f "$PYTHON" ]; then
+  VENV_PY_VER=$("$PYTHON" --version 2>&1 | grep -o "3\.[0-9]*" | head -1)
+  if [ "$VENV_PY_VER" = "3.6" ]; then
+    warn "Existing venv is Python 3.6 — recreating with Python 3.8..."
+    rm -rf "$VENV_DIR"
+  fi
+fi
+
+[ ! -f "$PYTHON" ] && python3.8 -m venv "$VENV_DIR"
+"$PIP" install --quiet --upgrade pip setuptools wheel
+
 info "Installing onnxruntime (GPU preferred)..."
-"$PIP" install --quiet onnxruntime-gpu 2>/dev/null || "$PIP" install --quiet onnxruntime || warn "onnxruntime install failed"
-info "Installing FastAPI + InsightFace..."
+"$PIP" install --quiet onnxruntime-gpu 2>/dev/null || \
+"$PIP" install --quiet "onnxruntime>=1.15.0" 2>/dev/null || \
+  warn "onnxruntime install failed — face matching will use CPU fallback"
+
+info "Installing FastAPI + InsightFace (pinned for ARM64/Python 3.8)..."
 "$PIP" install --quiet \
-  "fastapi>=0.100.0" "uvicorn>=0.22.0" "insightface>=0.7.3" \
-  "opencv-python-headless>=4.8.0" "numpy>=1.24.0" \
-  "pillow>=9.5.0" "python-multipart>=0.0.6" "aiofiles>=23.1.0"
-ok "Python AI stack ready"
+  "fastapi==0.103.2" \
+  "uvicorn==0.23.2" \
+  "starlette==0.27.0" \
+  "pydantic==1.10.13" \
+  "python-multipart==0.0.6" \
+  "aiofiles==23.1.0"
+
+"$PIP" install --quiet \
+  "numpy>=1.24.0,<2.0" \
+  "pillow>=9.5.0,<11.0" \
+  "opencv-python-headless>=4.8.0,<4.10"
+
+"$PIP" install --quiet "insightface>=0.7.3" || \
+  warn "insightface install failed — face verification will use browser fallback"
+
+ok "Python AI stack ready (Python 3.8)"
 
 # ── Patch server/main.py to prefer CUDA on Jetson ────────────────────────────
 step "Patch InsightFace server → CUDA auto-detect"

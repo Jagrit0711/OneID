@@ -67,22 +67,54 @@ echo "  Project dir →  ${SCRIPT_DIR}"
 echo "  Kiosk URL   →  ${KIOSK_URL}"
 echo ""
 
+# ── Resolve Python 3.8+ (Python 3.6 is default on JetPack 4.x — too old) ─────
+# Ubuntu 18.04 ships 3.8 in standard repos; just needs apt install python3.8
+PYTHON38=""
+for candidate in python3.9 python3.8 python3.7; do
+  command -v "$candidate" &>/dev/null && PYTHON38="$candidate" && break
+done
+
+if [ -z "$PYTHON38" ]; then
+  echo "  [venv]   Python 3.8 not found — installing from apt..."
+  sudo apt-get install -y --no-install-recommends python3.8 python3.8-venv python3.8-dev 2>/dev/null || \
+    { echo "  [FAIL]   Cannot install Python 3.8. Run: sudo apt install python3.8 python3.8-venv"; exit 1; }
+  PYTHON38="python3.8"
+fi
+echo "  [check]  Python binary   ✓  $($PYTHON38 --version 2>&1)"
+
 # ── Auto-create Python venv if missing ────────────────────────────────────────
 if [ ! -f "$PYTHON" ]; then
-  echo "  [venv]   Python venv not found at ${VENV_DIR}"
-  echo "  [venv]   Creating venv and installing dependencies..."
-  python3 -m venv "$VENV_DIR"
-  "$PIP" install --quiet --upgrade pip
+  echo "  [venv]   Creating venv with $PYTHON38..."
+  "$PYTHON38" -m venv "$VENV_DIR"
+  "$PIP" install --quiet --upgrade pip setuptools wheel
+
+  echo "  [venv]   Installing Python dependencies..."
+  # Pin versions that have ARM64 (aarch64) wheels on PyPI for Python 3.8
   "$PIP" install --quiet \
-    "fastapi>=0.100.0" "uvicorn>=0.22.0" \
-    "insightface>=0.7.3" \
-    "opencv-python-headless>=4.8.0" "numpy>=1.24.0" \
-    "pillow>=9.5.0" "python-multipart>=0.0.6" "aiofiles>=23.1.0"
-  # Try GPU onnxruntime, fall back to CPU
+    "fastapi==0.103.2" \
+    "uvicorn==0.23.2" \
+    "starlette==0.27.0" \
+    "pydantic==1.10.13" \
+    "python-multipart==0.0.6" \
+    "aiofiles==23.1.0"
+
+  "$PIP" install --quiet \
+    "numpy>=1.24.0,<2.0" \
+    "pillow>=9.5.0,<11.0"
+
+  "$PIP" install --quiet \
+    "opencv-python-headless>=4.8.0,<4.10"
+
+  echo "  [venv]   Installing InsightFace..."
+  "$PIP" install --quiet "insightface>=0.7.3" || \
+    echo "  [warn]   insightface failed — face verification will use browser fallback"
+
+  echo "  [venv]   Installing onnxruntime (trying GPU first)..."
   "$PIP" install --quiet onnxruntime-gpu 2>/dev/null || \
-  "$PIP" install --quiet onnxruntime || \
-  echo "  [warn]   onnxruntime install failed — face matching may be slow"
-  echo "  [venv]   Venv created ✓"
+  "$PIP" install --quiet "onnxruntime>=1.15.0" 2>/dev/null || \
+    echo "  [warn]   onnxruntime not installed — face matching will be slower"
+
+  echo "  [venv]   Venv ready ✓"
 fi
 echo "  [check]  Python venv     ✓  ${PYTHON}"
 
