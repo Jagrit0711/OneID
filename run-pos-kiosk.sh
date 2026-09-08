@@ -1,29 +1,46 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
 #  OneID — POS Kiosk Launcher  (Jetson Nano 4GB)
-#  ─────────────────────────────────────────────────────────────────────────────
-#  Starts the OneID stack. Zero npm/Node.js required at runtime.
-#  The Python FastAPI server serves BOTH the AI API and the React frontend.
+#  Zero npm/Node.js required at runtime.
+#  FastAPI (Python) serves BOTH the AI API and the React frontend on :8000.
 #
 #  Usage:
-#    ./run-pos-kiosk.sh              # boots to /kiosk   (Officer terminal)
-#    ./run-pos-kiosk.sh --consumer   # boots to /consumer (Citizen self-service)
-#    ./run-pos-kiosk.sh --admin      # boots to /super    (Admin dashboard)
-#    ./run-pos-kiosk.sh --home       # boots to /         (Portal selector)
-#
-#  Requirements (installed by jetson-setup.sh):
-#    - Python venv at server/venv   (InsightFace + FastAPI + StaticFiles)
-#    - .output/public/              (built React bundle)
-#    - chromium-browser
+#    ./run-pos-kiosk.sh              # /kiosk   (Officer terminal)
+#    ./run-pos-kiosk.sh --consumer   # /consumer (Citizen self-service)
+#    ./run-pos-kiosk.sh --admin      # /super    (Admin dashboard)
+#    ./run-pos-kiosk.sh --home       # /         (Portal selector)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVER_PORT=8000           # FastAPI serves both the API and the React frontend
+# ── Robust script directory resolution ────────────────────────────────────────
+# Works when called as: ./run-pos-kiosk.sh, bash run-pos-kiosk.sh,
+# /full/path/run-pos-kiosk.sh, or via LXDE/XDG autostart.
+_resolve_dir() {
+  local src="${BASH_SOURCE[0]:-$0}"
+  # Resolve symlinks
+  while [ -L "$src" ]; do src="$(readlink "$src")"; done
+  # If relative, make absolute using pwd
+  case "$src" in
+    /*) echo "$(dirname "$src")" ;;
+    *)  echo "$(cd "$(dirname "$src")" && pwd)" ;;
+  esac
+}
+SCRIPT_DIR="$(_resolve_dir)"
+
+# ── Sanity check: make sure we resolved a real directory ──────────────────────
+if [ ! -f "${SCRIPT_DIR}/server/main.py" ]; then
+  echo "[FAIL] Cannot find server/main.py relative to SCRIPT_DIR=${SCRIPT_DIR}"
+  echo "       Try running from the project root: cd /path/to/OneID && ./run-pos-kiosk.sh"
+  exit 1
+fi
+
+SERVER_PORT=8000
 LOG="/tmp/oneid-pos-kiosk.log"
-PYTHON="${SCRIPT_DIR}/server/venv/bin/python"
-MAIN_PY="${SCRIPT_DIR}/server/main.py"
+SERVER_DIR="${SCRIPT_DIR}/server"
+VENV_DIR="${SERVER_DIR}/venv"
+PYTHON="${VENV_DIR}/bin/python"
+PIP="${VENV_DIR}/bin/pip"
 
 # ── Parse --flag ───────────────────────────────────────────────────────────────
 TARGET_PATH="/kiosk"
@@ -46,26 +63,46 @@ echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  OneID POS Kiosk  ·  Jetson Nano 4GB  ·  $(date)"
 echo "════════════════════════════════════════════════════════════"
+echo "  Project dir →  ${SCRIPT_DIR}"
 echo "  Kiosk URL   →  ${KIOSK_URL}"
-echo "  API health  →  http://localhost:${SERVER_PORT}/health"
 echo ""
 
-# ── Pre-flight checks ──────────────────────────────────────────────────────────
+# ── Auto-create Python venv if missing ────────────────────────────────────────
 if [ ! -f "$PYTHON" ]; then
-  echo "  [FAIL]   Python venv not found: ${PYTHON}"
-  echo "           Run ./jetson-setup.sh first!"
-  exit 1
+  echo "  [venv]   Python venv not found at ${VENV_DIR}"
+  echo "  [venv]   Creating venv and installing dependencies..."
+  python3 -m venv "$VENV_DIR"
+  "$PIP" install --quiet --upgrade pip
+  "$PIP" install --quiet \
+    "fastapi>=0.100.0" "uvicorn>=0.22.0" \
+    "insightface>=0.7.3" \
+    "opencv-python-headless>=4.8.0" "numpy>=1.24.0" \
+    "pillow>=9.5.0" "python-multipart>=0.0.6" "aiofiles>=23.1.0"
+  # Try GPU onnxruntime, fall back to CPU
+  "$PIP" install --quiet onnxruntime-gpu 2>/dev/null || \
+  "$PIP" install --quiet onnxruntime || \
+  echo "  [warn]   onnxruntime install failed — face matching may be slow"
+  echo "  [venv]   Venv created ✓"
 fi
+echo "  [check]  Python venv     ✓  ${PYTHON}"
 
+# ── Check React build exists ──────────────────────────────────────────────────
 if [ ! -d "${SCRIPT_DIR}/.output/public" ]; then
+  echo ""
   echo "  [FAIL]   React build not found: ${SCRIPT_DIR}/.output/public"
-  echo "           Run ./jetson-setup.sh first (or npm run build on your dev machine"
-  echo "           and copy .output/ to the Jetson)."
+  echo ""
+  echo "  The .output/public/ folder must be built on your dev machine"
+  echo "  (Mac/Linux with Node.js) and committed/copied to the Jetson."
+  echo ""
+  echo "  On your Mac, in the project folder:"
+  echo "    npm run build"
+  echo "    git add .output/public && git commit -m 'build' && git push"
+  echo "  On Jetson:"
+  echo "    git pull"
+  echo ""
   exit 1
 fi
-
-echo "  [check]  Python venv     ✓"
-echo "  [check]  React build     ✓  (.output/public/)"
+echo "  [check]  React build     ✓  .output/public/"
 
 # ── Display / X11 ─────────────────────────────────────────────────────────────
 export DISPLAY="${DISPLAY:-:0}"
@@ -82,41 +119,35 @@ command -v unclutter &>/dev/null && unclutter -idle 1 -root & UNCLUTTER_PID=${!:
 # ── Kill stale processes ──────────────────────────────────────────────────────
 pkill -f "chromium.*--kiosk" 2>/dev/null || true
 pkill -f "uvicorn"           2>/dev/null || true
-pkill -f "main.py"           2>/dev/null || true
+pkill -f "main\.py"          2>/dev/null || true
 sleep 1
 
-# ── Start the OneID Python server (API + React frontend in one process) ───────
-echo "  [server] Starting OneID Python server (API + frontend) on :${SERVER_PORT}..."
-cd "${SCRIPT_DIR}/server"
+# ── Start the OneID Python server (API + React SPA in one process) ─────────-─
+echo "  [server] Starting OneID server (API + frontend) on :${SERVER_PORT}..."
+cd "${SERVER_DIR}"
 "$PYTHON" main.py &
 SERVER_PID=$!
 cd "${SCRIPT_DIR}"
 echo "  [server] PID=${SERVER_PID}"
 
 # ── Wait for server to be ready ───────────────────────────────────────────────
-echo "  [wait]   Waiting for server to be ready..."
+echo "  [wait]   Waiting for server..."
+echo "           (InsightFace model loads in ~30s on first boot)"
 ELAPSED=0
 until curl -sf "http://localhost:${SERVER_PORT}/health" > /dev/null 2>&1; do
-  sleep 2
-  ELAPSED=$((ELAPSED + 2))
-  printf "  [wait]   %ds (InsightFace model loading takes ~30s first time)...\r" "$ELAPSED"
+  sleep 3
+  ELAPSED=$((ELAPSED + 3))
+  printf "  [wait]   %ds...\r" "$ELAPSED"
   if [ "$ELAPSED" -ge 180 ]; then
     echo ""
     echo "  [FAIL]   Server did not start after ${ELAPSED}s"
-    echo "           Check logs: sudo journalctl -fu oneid-ai-server"
+    echo "           Tail logs: tail -f /tmp/oneid-pos-kiosk.log"
     kill "${SERVER_PID}" 2>/dev/null || true
     exit 1
   fi
 done
 echo ""
-echo "  [server] Ready ✓ → http://localhost:${SERVER_PORT}"
-
-# Verify the frontend is also being served
-if curl -sf "http://localhost:${SERVER_PORT}/" | grep -q "html" 2>/dev/null; then
-  echo "  [serve]  React frontend served ✓"
-else
-  echo "  [warn]   React build may not be mounted — check .output/public exists"
-fi
+echo "  [server] Ready ✓"
 
 # ── Find Chromium ─────────────────────────────────────────────────────────────
 CHROMIUM_BIN=""
@@ -126,7 +157,7 @@ done
 
 if [ -z "$CHROMIUM_BIN" ]; then
   echo "  [FAIL]   Chromium not found!"
-  echo "           Install with: sudo apt install chromium-browser"
+  echo "           Install: sudo apt install chromium-browser"
   kill "${SERVER_PID}" 2>/dev/null || true
   exit 1
 fi
@@ -136,10 +167,8 @@ PROFILE_DIR="/tmp/oneid-chromium-profile"
 rm -rf "$PROFILE_DIR" && mkdir -p "$PROFILE_DIR"
 
 echo ""
-echo "  ─────────────────────────────────────────────────────────"
 echo "  Launching → ${KIOSK_URL}"
 echo "  Ctrl+C to stop"
-echo "  ─────────────────────────────────────────────────────────"
 echo ""
 
 # ── Launch Chromium with Jetson GPU flags ─────────────────────────────────────
@@ -169,7 +198,7 @@ echo "  [kiosk]  Chromium PID=${BROWSER_PID}"
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 cleanup() {
   echo ""
-  echo "  [stop]   Shutting down OneID POS Kiosk..."
+  echo "  [stop]   Shutting down..."
   kill "${BROWSER_PID}" 2>/dev/null || true
   kill "${SERVER_PID}"  2>/dev/null || true
   kill "${UNCLUTTER_PID:-0}" 2>/dev/null || true
