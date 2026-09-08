@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PortalSwitcherBar } from "@/components/ui/PortalSwitcherBar";
 import { useMemo, useState } from "react";
 import {
   ShieldCheck,
@@ -568,8 +569,8 @@ function SuperDashboard() {
     <div className="min-h-screen bg-background text-foreground select-none">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
+          <div className="flex items-center gap-3 shrink-0">
             <Link to="/" className="flex items-center">
               <OneIdLogo size="sm" />
             </Link>
@@ -578,7 +579,11 @@ function SuperDashboard() {
               Super-Official Admin
             </span>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Portal Switcher */}
+          <PortalSwitcherBar active="super" />
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={refresh}

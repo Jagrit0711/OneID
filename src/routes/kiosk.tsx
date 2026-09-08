@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { PortalSwitcherBar } from "@/components/ui/PortalSwitcherBar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AadhaarData } from "aadhaar-react-scanner";
 import {
@@ -382,20 +383,23 @@ function KioskTerminal() {
     <div className="min-h-screen bg-background text-foreground select-none">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
+          <div className="flex items-center gap-3 shrink-0">
             <Link to="/" className="flex items-center">
               <OneIdLogo size="sm" />
             </Link>
             <div className="h-5 w-px bg-border" />
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-              Kiosk Terminal · {getTerminalId()}
+            <span className="hidden lg:inline text-xs font-bold uppercase tracking-widest text-emerald-400">
+              Kiosk · {getTerminalId()}
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Portal Switcher */}
+          <PortalSwitcherBar active="kiosk" />
+
+          <div className="flex items-center gap-3 shrink-0">
             <IdleClock />
-            <div className="flex items-center gap-2.5 text-sm font-medium">
+            <div className="flex items-center gap-2 text-sm font-medium">
               <div className="size-8 overflow-hidden rounded-full border border-emerald-500/40 bg-slate-800">
                 {officialPhoto ? (
                   <img src={officialPhoto} alt={officialData?.name} className="size-full object-cover" />
@@ -403,7 +407,7 @@ function KioskTerminal() {
                   <User className="size-full p-1.5 text-slate-400" />
                 )}
               </div>
-              <div>
+              <div className="hidden md:block">
                 <p className="font-bold leading-none text-foreground text-sm">
                   Officer {officialData?.name || "Official"}
                 </p>

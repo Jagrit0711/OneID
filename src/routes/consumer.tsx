@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { PortalSwitcherBar } from "@/components/ui/PortalSwitcherBar";
 import { useCallback, useMemo, useState, type ChangeEvent } from "react";
 import type { AadhaarData } from "aadhaar-react-scanner";
 import {
@@ -366,8 +367,8 @@ function ConsumerApp() {
     <div className="min-h-screen bg-background text-foreground select-none">
       {/* Top Bar */}
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3">
+          <div className="flex items-center gap-3 shrink-0">
             <Link to="/" className="flex items-center">
               <OneIdLogo size="sm" />
             </Link>
@@ -376,7 +377,10 @@ function ConsumerApp() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Portal Switcher */}
+          <PortalSwitcherBar active="consumer" />
+
+          <div className="flex items-center gap-3 shrink-0">
             {/* Tab switcher */}
             <div className="flex items-center rounded-xl bg-secondary/80 p-1">
               <button
