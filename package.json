@@ -12,7 +12,9 @@
     "format": "prettier --write .",
     "macbook": "bash run-macbook.sh",
     "kiosk": "bash run-kiosk.sh",
-    "server": "bash run-server.sh"
+    "server": "bash run-server.sh",
+    "share": "bash share-live.sh",
+    "build:vercel": "NITRO_PRESET=vercel vite build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
