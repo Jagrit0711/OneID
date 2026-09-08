@@ -7,11 +7,14 @@ Runs 100% locally with zero external cloud dependencies.
 
 import base64
 import os
+import pathlib
 import sys
 import numpy as np
 import cv2
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -218,6 +221,44 @@ def verify_faces(req: VerifyRequest):
         "confidence": confidence,
         "engine": "InsightFace ArcFace (512-dim 99.86% model)"
     }
+
+# ── Serve the React production build (static files) ──────────────────────────
+# The built frontend lives at  <repo-root>/.output/public/
+# This server file is at       <repo-root>/server/main.py
+# So we resolve two levels up.
+_PUBLIC_DIR = pathlib.Path(__file__).parent.parent / ".output" / "public"
+
+if _PUBLIC_DIR.is_dir():
+    # Mount all static assets (JS, CSS, images, etc.) under /_assets
+    # The React router handles client-side routing, so unknown paths fall through
+    # to the SPA index.html catch-all below.
+    app.mount("/assets", StaticFiles(directory=str(_PUBLIC_DIR / "assets")), name="assets")
+    app.mount("/models", StaticFiles(directory=str(_PUBLIC_DIR / "models")), name="models") if (_PUBLIC_DIR / "models").is_dir() else None
+
+    @app.get("/favicon.png")
+    @app.get("/favicon.ico")
+    async def favicon(request: Request):
+        for fname in ["favicon.png", "favicon.ico"]:
+            f = _PUBLIC_DIR / fname
+            if f.exists():
+                return FileResponse(str(f))
+        return FileResponse(str(_PUBLIC_DIR / "index.html"))
+
+    # SPA catch-all: any route not matched by the API returns index.html
+    # so React Router handles /kiosk, /consumer, /super, etc. client-side.
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str, request: Request):
+        # Serve actual files that exist (JS chunks, etc.)
+        candidate = _PUBLIC_DIR / full_path
+        if candidate.exists() and candidate.is_file():
+            return FileResponse(str(candidate))
+        # Everything else → index.html (React Router takes over)
+        return FileResponse(str(_PUBLIC_DIR / "index.html"))
+
+    print(f"[OneID] Serving React frontend from {_PUBLIC_DIR}")
+else:
+    print(f"[OneID] WARNING: {_PUBLIC_DIR} not found — API-only mode")
+    print("[OneID] Run 'npm run build' on your dev machine and copy .output/ here")
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,28 +2,30 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #  OneID — POS Kiosk Launcher  (Jetson Nano 4GB)
 #  ─────────────────────────────────────────────────────────────────────────────
-#  Starts the full OneID stack — AI backend + React frontend + Chromium kiosk.
+#  Starts the OneID stack. Zero npm/Node.js required at runtime.
+#  The Python FastAPI server serves BOTH the AI API and the React frontend.
 #
 #  Usage:
-#    ./run-pos-kiosk.sh              # boots to /kiosk  (Officer terminal)
+#    ./run-pos-kiosk.sh              # boots to /kiosk   (Officer terminal)
 #    ./run-pos-kiosk.sh --consumer   # boots to /consumer (Citizen self-service)
-#    ./run-pos-kiosk.sh --admin      # boots to /super   (Admin dashboard)
-#    ./run-pos-kiosk.sh --home       # boots to /        (Portal selector)
+#    ./run-pos-kiosk.sh --admin      # boots to /super    (Admin dashboard)
+#    ./run-pos-kiosk.sh --home       # boots to /         (Portal selector)
 #
 #  Requirements (installed by jetson-setup.sh):
-#    - Node.js 20+, npm, npx serve
-#    - Python venv in server/venv with InsightFace
-#    - Chromium (chromium-browser)
+#    - Python venv at server/venv   (InsightFace + FastAPI + StaticFiles)
+#    - .output/public/              (built React bundle)
+#    - chromium-browser
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVE_PORT=8080
-AI_PORT=8000
+SERVER_PORT=8000           # FastAPI serves both the API and the React frontend
 LOG="/tmp/oneid-pos-kiosk.log"
+PYTHON="${SCRIPT_DIR}/server/venv/bin/python"
+MAIN_PY="${SCRIPT_DIR}/server/main.py"
 
-# ── Parse --flag argument ─────────────────────────────────────────────────────
+# ── Parse --flag ───────────────────────────────────────────────────────────────
 TARGET_PATH="/kiosk"
 case "${1:-}" in
   --consumer) TARGET_PATH="/consumer" ;;
@@ -36,7 +38,7 @@ case "${1:-}" in
     ;;
 esac
 
-KIOSK_URL="http://localhost:${SERVE_PORT}${TARGET_PATH}"
+KIOSK_URL="http://localhost:${SERVER_PORT}${TARGET_PATH}"
 
 exec > >(tee -a "$LOG") 2>&1
 
@@ -44,9 +46,26 @@ echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  OneID POS Kiosk  ·  Jetson Nano 4GB  ·  $(date)"
 echo "════════════════════════════════════════════════════════════"
-echo "  Target URL  →  ${KIOSK_URL}"
-echo "  AI Backend  →  http://localhost:${AI_PORT}/health"
+echo "  Kiosk URL   →  ${KIOSK_URL}"
+echo "  API health  →  http://localhost:${SERVER_PORT}/health"
 echo ""
+
+# ── Pre-flight checks ──────────────────────────────────────────────────────────
+if [ ! -f "$PYTHON" ]; then
+  echo "  [FAIL]   Python venv not found: ${PYTHON}"
+  echo "           Run ./jetson-setup.sh first!"
+  exit 1
+fi
+
+if [ ! -d "${SCRIPT_DIR}/.output/public" ]; then
+  echo "  [FAIL]   React build not found: ${SCRIPT_DIR}/.output/public"
+  echo "           Run ./jetson-setup.sh first (or npm run build on your dev machine"
+  echo "           and copy .output/ to the Jetson)."
+  exit 1
+fi
+
+echo "  [check]  Python venv     ✓"
+echo "  [check]  React build     ✓  (.output/public/)"
 
 # ── Display / X11 ─────────────────────────────────────────────────────────────
 export DISPLAY="${DISPLAY:-:0}"
@@ -55,84 +74,48 @@ for xa in "$HOME/.Xauthority" "/home/oneid/.Xauthority" "/var/run/lightdm/root/:
 done
 echo "  [disp]   DISPLAY=${DISPLAY}"
 
-# Disable screensaver / blanking
 xset s off 2>/dev/null || true
 xset s noblank 2>/dev/null || true
 xset -dpms 2>/dev/null || true
-
-# Hide cursor after 1s idle
 command -v unclutter &>/dev/null && unclutter -idle 1 -root & UNCLUTTER_PID=${!:-0}
 
 # ── Kill stale processes ──────────────────────────────────────────────────────
-pkill -f "chromium.*--kiosk"  2>/dev/null || true
-pkill -f "npx.*serve"         2>/dev/null || true
-pkill -f "uvicorn.*main"      2>/dev/null || true
+pkill -f "chromium.*--kiosk" 2>/dev/null || true
+pkill -f "uvicorn"           2>/dev/null || true
+pkill -f "main.py"           2>/dev/null || true
 sleep 1
 
-# ── Ensure production build exists ────────────────────────────────────────────
-cd "$SCRIPT_DIR"
-if [ ! -d ".output/public" ]; then
-  echo "  [build]  Production bundle not found — building now (takes ~2 min)..."
-  npm run build
-  echo "  [build]  Build complete ✓"
-else
-  echo "  [build]  Production bundle found ✓ (.output/public/)"
-fi
+# ── Start the OneID Python server (API + React frontend in one process) ───────
+echo "  [server] Starting OneID Python server (API + frontend) on :${SERVER_PORT}..."
+cd "${SCRIPT_DIR}/server"
+"$PYTHON" main.py &
+SERVER_PID=$!
+cd "${SCRIPT_DIR}"
+echo "  [server] PID=${SERVER_PID}"
 
-# ── Start Python InsightFace AI backend ──────────────────────────────────────
-SERVER_DIR="$SCRIPT_DIR/server"
-PYTHON="$SERVER_DIR/venv/bin/python"
-
-if [ ! -f "$PYTHON" ]; then
-  echo "  [warn]   Python venv not found at $PYTHON"
-  echo "           Run ./jetson-setup.sh first to install all dependencies."
-else
-  echo "  [ai]     Starting InsightFace ArcFace server..."
-  cd "$SERVER_DIR"
-  "$PYTHON" main.py &
-  AI_PID=$!
-  cd "$SCRIPT_DIR"
-  echo "  [ai]     PID=${AI_PID}"
-fi
-
-# ── Start static React server ─────────────────────────────────────────────────
-echo "  [serve]  Starting static server on port ${SERVE_PORT}..."
-npx --yes serve .output/public --single --listen "${SERVE_PORT}" &
-SERVE_PID=$!
-
-# ── Wait for static server to be ready ────────────────────────────────────────
-echo "  [wait]   Waiting for static server..."
+# ── Wait for server to be ready ───────────────────────────────────────────────
+echo "  [wait]   Waiting for server to be ready..."
 ELAPSED=0
-until curl -sf "http://localhost:${SERVE_PORT}" > /dev/null 2>&1; do
+until curl -sf "http://localhost:${SERVER_PORT}/health" > /dev/null 2>&1; do
   sleep 2
   ELAPSED=$((ELAPSED + 2))
-  printf "  [wait]   %ds...\r" "$ELAPSED"
-  if [ "$ELAPSED" -ge 90 ]; then
+  printf "  [wait]   %ds (InsightFace model loading takes ~30s first time)...\r" "$ELAPSED"
+  if [ "$ELAPSED" -ge 180 ]; then
     echo ""
-    echo "  [error]  Timeout waiting for static server — aborting"
-    kill "${SERVE_PID}" 2>/dev/null || true
-    kill "${AI_PID:-0}" 2>/dev/null || true
+    echo "  [FAIL]   Server did not start after ${ELAPSED}s"
+    echo "           Check logs: sudo journalctl -fu oneid-ai-server"
+    kill "${SERVER_PID}" 2>/dev/null || true
     exit 1
   fi
 done
-echo "  [serve]  Ready ✓ → http://localhost:${SERVE_PORT}"
+echo ""
+echo "  [server] Ready ✓ → http://localhost:${SERVER_PORT}"
 
-# ── Wait for AI backend (non-fatal — MediaPipe fallback in browser) ───────────
-echo "  [ai]     Waiting for InsightFace API..."
-ELAPSED=0
-until curl -sf "http://localhost:${AI_PORT}/health" > /dev/null 2>&1; do
-  sleep 3
-  ELAPSED=$((ELAPSED + 3))
-  printf "  [ai]     %ds...\r" "$ELAPSED"
-  if [ "$ELAPSED" -ge 120 ]; then
-    echo ""
-    echo "  [warn]   AI backend not ready after ${ELAPSED}s — kiosk will start with MediaPipe CPU fallback"
-    break
-  fi
-done
-if curl -sf "http://localhost:${AI_PORT}/health" > /dev/null 2>&1; then
-  HEALTH=$(curl -sf "http://localhost:${AI_PORT}/health" 2>/dev/null || echo "{}")
-  echo "  [ai]     InsightFace ready ✓  ($(echo "$HEALTH" | grep -o '"model":"[^"]*"' | head -1))"
+# Verify the frontend is also being served
+if curl -sf "http://localhost:${SERVER_PORT}/" | grep -q "html" 2>/dev/null; then
+  echo "  [serve]  React frontend served ✓"
+else
+  echo "  [warn]   React build may not be mounted — check .output/public exists"
 fi
 
 # ── Find Chromium ─────────────────────────────────────────────────────────────
@@ -142,32 +125,24 @@ for candidate in chromium-browser chromium google-chrome-stable google-chrome; d
 done
 
 if [ -z "$CHROMIUM_BIN" ]; then
-  echo "  [error]  Chromium not found!"
+  echo "  [FAIL]   Chromium not found!"
   echo "           Install with: sudo apt install chromium-browser"
-  kill "${SERVE_PID}" 2>/dev/null || true
-  kill "${AI_PID:-0}" 2>/dev/null || true
+  kill "${SERVER_PID}" 2>/dev/null || true
   exit 1
 fi
-echo "  [browser] Using: ${CHROMIUM_BIN}"
+echo "  [browser] ${CHROMIUM_BIN}"
 
-# ── Clean profile dir ─────────────────────────────────────────────────────────
 PROFILE_DIR="/tmp/oneid-chromium-profile"
 rm -rf "$PROFILE_DIR" && mkdir -p "$PROFILE_DIR"
 
 echo ""
 echo "  ─────────────────────────────────────────────────────────"
-echo "  Launching kiosk → ${KIOSK_URL}"
-echo "  Press Ctrl+C to stop everything"
+echo "  Launching → ${KIOSK_URL}"
+echo "  Ctrl+C to stop"
 echo "  ─────────────────────────────────────────────────────────"
 echo ""
 
-# ── Launch Chromium with Tegra GPU flags ──────────────────────────────────────
-#  --enable-gpu-rasterization         Tegra GPU compositing
-#  --enable-zero-copy                 DMA-BUF zero-copy for camera frames
-#  --enable-native-gpu-memory-buffers Jetson shared memory GPU path
-#  --ignore-gpu-blocklist             Jetson is on Chrome's denylist — override
-#  --use-gl=egl                       EGL for Tegra driver compatibility
-#  --in-process-gpu                   Less IPC overhead on 4GB RAM
+# ── Launch Chromium with Jetson GPU flags ─────────────────────────────────────
 DISPLAY="$DISPLAY" "$CHROMIUM_BIN" \
   --kiosk \
   --noerrdialogs \
@@ -186,22 +161,19 @@ DISPLAY="$DISPLAY" "$CHROMIUM_BIN" \
   --disable-features=IsolateOrigins,site-per-process \
   --autoplay-policy=no-user-gesture-required \
   --use-fake-ui-for-media-stream \
-  --allow-running-insecure-content \
   "$KIOSK_URL" &
 
 BROWSER_PID=$!
 echo "  [kiosk]  Chromium PID=${BROWSER_PID}"
 
-# ── Cleanup on Ctrl+C / exit ─────────────────────────────────────────────────
+# ── Cleanup ───────────────────────────────────────────────────────────────────
 cleanup() {
   echo ""
   echo "  [stop]   Shutting down OneID POS Kiosk..."
-  kill "$BROWSER_PID" 2>/dev/null || true
-  kill "${SERVE_PID}"  2>/dev/null || true
-  kill "${AI_PID:-0}"  2>/dev/null || true
+  kill "${BROWSER_PID}" 2>/dev/null || true
+  kill "${SERVER_PID}"  2>/dev/null || true
   kill "${UNCLUTTER_PID:-0}" 2>/dev/null || true
-  echo "  [stop]   All processes stopped."
+  echo "  [stop]   Done."
 }
 trap cleanup EXIT INT TERM
-
-wait "$BROWSER_PID"
+wait "${BROWSER_PID}"
